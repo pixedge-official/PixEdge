@@ -57,7 +57,14 @@ async def predict(file: UploadFile = File(...)):
     # Find the actual image file saved by YOLO
     saved_images = [f for f in os.listdir(result_dir) if f.endswith(".jpg")]
     if not saved_images:
-        return "<html><body><h2>No result image found.</h2></body></html>"
+        return """
+        <html>
+            <body>
+                <h2>No result image found.</h2>
+                <a href="/">Go back</a>
+            </body>
+        </html>
+        """
 
     result_img_name = saved_images[0]  # Use the first .jpg found
     result_img_path = f"/runs/detect/{result_folder}/{result_img_name}"
