@@ -54,4 +54,3 @@ async def predict(file: UploadFile = File(...)):
             <br><a href="/">Try another</a>
         </body>
     </html>
-    """
