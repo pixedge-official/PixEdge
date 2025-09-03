@@ -24,6 +24,7 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # Serve static files
 app.mount("/runs", StaticFiles(directory="runs"), name="runs")
 
+
 # Home page
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -51,6 +52,7 @@ async def home():
     </html>
     """
 
+
 # Prediction endpoint
 @app.post("/predict", response_class=HTMLResponse)
 async def predict(file: UploadFile = File(...)):
@@ -63,11 +65,24 @@ async def predict(file: UploadFile = File(...)):
     # Run YOLOv8 prediction
     results = model.predict(source=file_path, save=True, imgsz=640)
 
-    # Get the folder where results are saved
+    # Get detections
+    boxes = results[0].boxes
+    class_ids = boxes.cls.int().tolist()
+    class_names = results[0].names
+
+    # Count detections
+    car_count = sum(1 for cid in class_ids if class_names[cid].lower() == "car")
+    vacant_count = sum(1 for cid in class_ids if class_names[cid].lower() in ["vacant", "empty", "space"])
+
+    # Calculate occupancy %
+    total_slots = car_count + vacant_count
+    occupancy = round((car_count / total_slots) * 100, 1) if total_slots > 0 else 0
+
+    # Get result folder
     result_folder = os.path.basename(results[0].save_dir)
     result_dir = results[0].save_dir
 
-    # Find the actual image file saved by YOLO
+    # Find YOLO output image
     saved_images = [f for f in os.listdir(result_dir) if f.endswith(".jpg")]
     if not saved_images:
         return """
@@ -81,10 +96,10 @@ async def predict(file: UploadFile = File(...)):
         </html>
         """
 
-    result_img_name = saved_images[0]  # Use the first .jpg found
+    result_img_name = saved_images[0]
     result_img_path = f"/runs/detect/{result_folder}/{result_img_name}"
 
-    # Return styled result page
+    # Show results with counts
     return f"""
     <html>
         <head>
@@ -95,6 +110,11 @@ async def predict(file: UploadFile = File(...)):
             <div class="bg-white shadow-lg rounded-2xl p-8 max-w-xl w-full text-center">
                 <h2 class="text-2xl font-bold text-violet-600 mb-6">Detection Result</h2>
                 <img src="{result_img_path}" alt="Result" class="rounded-xl shadow-md mx-auto mb-6"/>
+                <div class="grid grid-cols-3 gap-4 text-lg font-semibold mb-6">
+                    <div class="text-green-600">🚗 Cars<br>{car_count}</div>
+                    <div class="text-blue-600">🅿 Vacant<br>{vacant_count}</div>
+                    <div class="text-violet-600">📊 Occupancy<br>{occupancy}%</div>
+                </div>
                 <a href="/" class="bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-6 rounded-xl shadow-md transition">
                     Try Another
                 </a>
